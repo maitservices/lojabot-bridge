@@ -1,0 +1,6 @@
+2026/02/12-14:33:37.453 20347 Reusing MANIFEST /home/murilo/Documentos/lojabot-bridge/lojabot-bridge/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
+2026/02/12-14:33:37.469 20347 Recovering log #3
+2026/02/12-14:33:37.471 20347 Reusing old log /home/murilo/Documentos/lojabot-bridge/lojabot-bridge/.wwebjs_auth/session/Default/Local Storage/leveldb/000003.log 
+2026/02/12-14:34:37.475 2034b Level-0 table #5: started
+2026/02/12-14:34:37.662 2034b Level-0 table #5: 18069 bytes OK
+2026/02/12-14:34:37.786 2034b Delete type=0 #3
