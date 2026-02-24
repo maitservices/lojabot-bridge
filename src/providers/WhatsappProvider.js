@@ -32,6 +32,12 @@ class WhatsappProvider {
 
         // Evento: Quando chega mensagem
         this.client.on('message', async (msg) => {
+            // 1. Validação de Tempo: Ignora se a mensagem tiver mais de 10 minutos
+            if (!isMessageRecent(msg.timestamp)) {
+                console.log(`[Filtro] Mensagem ignorada por ser muito antiga (ID: ${msg.id.id})`);
+                return;
+            }
+
             // Lógica Refinada: Ignora grupos (@g.us), status e broadcasts
             const isGroup = msg.from.includes('@g.us');
             const isStatus = msg.from === 'status@broadcast';
@@ -69,5 +75,17 @@ class WhatsappProvider {
         }
     }
 }
+/**
+    * Verifica se a mensagem foi enviada nos últimos 10 minutos.
+    * Justificativa: Evita que o bot responda mensagens acumuladas durante períodos offline.
+    * @param {number} messageTimestamp - O timestamp da mensagem (em segundos).
+    * @returns {boolean}
+    */
+    const isMessageRecent = (messageTimestamp) => {
+        const tenMinutesInSeconds = 10 * 60; // 600 segundos
+        const currentTimestamp = Math.floor(Date.now() / 1000); // Converte ms para seg
+        
+        return (currentTimestamp - messageTimestamp) <= tenMinutesInSeconds;
+    };
 
 module.exports = new WhatsappProvider();

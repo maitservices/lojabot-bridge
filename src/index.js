@@ -22,7 +22,9 @@ async function bootstrap() {
         console.log(`[Lojabot] Resposta gerada.`);
 
         // 2. Simula tempo de digitação para proteção de banimento (UX)
-        await delay(parseInt(process.env.MESSAGE_DELAY) || 2000);
+        //await delay(parseInt(process.env.MESSAGE_DELAY) || 2000);
+        const randomDelay = () => Math.floor(Math.random() * (parseInt(process.env.MESSAGE_DELAY) - 3000 + 1) + 3000);
+        await delay(randomDelay());
 
         // 3. Envia a resposta final de volta ao cliente no WhatsApp
         await whatsapp.sendText(chatId, responseText);
