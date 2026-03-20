@@ -20,7 +20,7 @@ async function bootstrap() {
             const contact = await msg.getContact();
             const numero = contact.number;
             console.log(`msg.from: ${numero})`);
-            const chatId = numero;  
+            const chatId = msg.from;
             const isCommand = await commandRouter.handle(msg, whatsapp);
             if (isCommand) return; 
 

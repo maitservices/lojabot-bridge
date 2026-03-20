@@ -14,7 +14,7 @@ class SupabaseService {
         try {
             console.log(`[Supabase] Buscando instruções para o agente: ${agentName}...`);
             
-            const url = process.env.SUPABASE_URL_FUNCTION;
+            const url = process.env.SUPABASE_URL_FUNCTION_INSTRUCTION_AGENT;
             const token = process.env.SUPABASE_ANON_KEY;
 
             // 🚨 DEBUG: Vamos ver exatamente o que o Node.js está segurando
