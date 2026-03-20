@@ -1,0 +1,48 @@
+const axios = require('axios');
+const path = require('path');
+// Força o Node a procurar o .env na raiz do projeto
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+// Adicione este log temporário para testar. Se imprimir 'undefined', o erro persiste no arquivo .env
+console.log("🔑 Token Supabase:", process.env.SUPABASE_ANON_KEY ? "Carregado" : "Falhou");
+class SupabaseService {
+    /**
+     * Busca as instruções dinâmicas do agente via Edge Function
+     * @param {string} agentName - Nome do agente a ser buscado (ex: MeuAgente)
+     * @returns {Promise<string>} O texto da instrução
+     */
+    async fetchAgentInstruction(agentName) {
+        try {
+            console.log(`[Supabase] Buscando instruções para o agente: ${agentName}...`);
+            
+            const url = process.env.SUPABASE_URL_FUNCTION;
+            const token = process.env.SUPABASE_ANON_KEY;
+
+            // 🚨 DEBUG: Vamos ver exatamente o que o Node.js está segurando
+            console.log("-------------------------------------------------");
+            console.log("URL:", url);
+            console.log("Token Carregado?", token ? "SIM" : "NÃO");
+            console.log("Primeiros 15 chars do token:", token ? token.substring(0, 15) : "undefined");
+            console.log("Tamanho do token:", token ? token.length : 0);
+            console.log("-------------------------------------------------");
+            console.log("agentName: ",agentName);
+            const response = await axios.get(url, {
+                params: { nome_agente: agentName },
+                headers: {
+                    'Authorization': `Bearer ${token}` // O espaço depois do Bearer é crucial
+                }
+            });
+            // Retorna o valor contido no campo esperado
+            if (response.data.result && response.data.result.instrucao_agente) {
+                return response.data.result.instrucao_agente;
+            } else {
+                throw new Error("Campo 'instrucao_agente' não encontrado no payload de retorno.");
+            }
+
+        } catch (error) {
+            console.error(`❌ [Supabase] Erro ao buscar instruções: ${error.message}`);
+            throw error; // Propaga o erro para impedir a inicialização do bot sem instruções
+        }
+    }
+}
+
+module.exports = new SupabaseService();
