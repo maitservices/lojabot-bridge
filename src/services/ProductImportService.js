@@ -12,7 +12,7 @@ class ProductImportService {
     /**
      * Ponto de entrada do serviço. Recebe o buffer do arquivo (CSV/XLSX),
      * extrai os dados e orquestra o envio.
-     * * @param {Buffer|string} fileData - O conteúdo do arquivo em Buffer ou Base64
+     * @param {Buffer|string} fileData - O conteúdo do arquivo em Buffer ou Base64
      * @returns {Promise<Object>} Resumo da operação
      */
     async processFile(fileData) {
@@ -20,7 +20,7 @@ class ProductImportService {
 
         try {
             // 1. Leitura do arquivo (a lib xlsx abstrai a diferença entre CSV e Excel)
-            const workbook = xlsx.read(fileData, { type: 'buffer' }); // Altere para 'base64' se o input vier como base64
+            const workbook = xlsx.read(fileData, { type: 'buffer' }); 
             
             // Pega a primeira aba da planilha
             const firstSheetName = workbook.SheetNames[0];
@@ -47,7 +47,7 @@ class ProductImportService {
 
     /**
      * Varre o array de dados, valida regras de negócio (Fail Fast) e envia para a Edge Function.
-     * * @param {Array<Object>} rows - Array de produtos extraídos da planilha
+     * @param {Array<Object>} rows - Array de produtos extraídos da planilha
      */
     async syncWithDatabase(rows) {
         let successCount = 0;
@@ -59,16 +59,35 @@ class ProductImportService {
             const linhaReal = index + 2; // +2 porque o array começa em 0 e a linha 1 é o cabeçalho no Excel
 
             try {
+                // --- REGRA DE NEGÓCIO: DISPONIBILIDADE ---
+                // Padrão: Vazio ou 'Y' (Yes) = true | 'N' (No) = false
+                let disponivelBool = true; // Assume verdadeiro se vier vazio
+                if (row.disponivel !== undefined && row.disponivel !== null) {
+                    const valorPlanilha = String(row.disponivel).trim().toUpperCase();
+                    if (valorPlanilha === 'N') {
+                        disponivelBool = false;
+                    }
+                }
+
                 // 1. Mapeamento Defensivo (garante que os dados tenham a estrutura esperada)
                 const payload = {
-                    user_id: row.user_id ? String(row.user_id) : process.env.ADMIN_USER_ID, // Pode injetar um default do .env se faltar
+                    user_id: row.user_id ? String(row.user_id) : process.env.ADMIN_USER_ID,
                     sku: row.sku ? String(row.sku) : null,
                     nome_produto: row.nome_produto,
                     valor_un: Number(row.valor_un) || 0,
-                    qtd: Number(row.qtd) || 0
+                    qtd: Number(row.qtd) || 0,
+                    
+                    // Novos campos com checagem de existência para não mandar "undefined" como texto
+                    descricao: row.descricao ? String(row.descricao).trim() : undefined,
+                    imagens_urls: row.imagens_urls ? String(row.imagens_urls).trim() : undefined,
+                    disponivel: disponivelBool
                 };
 
-                // 2. Validação Local (Fail Fast) - Evita bater na API se já sabemos que vai dar erro 400
+                // Remove chaves 'undefined' do objeto para gerar um JSON limpo
+                // Isso garante que se não houver 'descricao' na planilha, ele nem envia o campo
+                Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+                // 2. Validação Local (Fail Fast)
                 if (!payload.nome_produto || !payload.user_id) {
                     throw new Error(`Campos obrigatórios ausentes (user_id ou nome_produto)`);
                 }
@@ -86,7 +105,6 @@ class ProductImportService {
 
             } catch (error) {
                 errorCount++;
-                // Captura a mensagem de erro da Edge Function (se for 400/500) ou o erro de validação local
                 const errorMsg = error.response?.data?.error || error.message;
                 console.error(`[ProductImport] ❌ Linha ${linhaReal} falhou: ${errorMsg}`);
                 errorDetails.push(`Linha ${linhaReal}: ${errorMsg}`);
