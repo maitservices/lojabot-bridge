@@ -43,6 +43,30 @@ class SupabaseService {
             throw error; // Propaga o erro para impedir a inicialização do bot sem instruções
         }
     }
+
+    /**
+     * Busca os números de WhatsApp dos vendedores de uma loja específica
+     * @param {string} tenantId 
+     * @returns {Promise<Array>} Ex: [{ whatsapp_number: '554199999999', nome: 'João' }]
+     */
+    async getHumanAttendants(tenantId) {
+        try {
+            const baseUrl = process.env.SUPABASE_URL_FUNCTION;
+            const url = `${baseUrl}/functions/v1/get-human-attendants`;
+            
+            const response = await axios.post(url, { tenant_id: tenantId }, {
+                headers: {
+                    'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY?.trim()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            return response.data.result || [];
+        } catch (error) {
+            console.error(`[SupabaseService] Erro ao buscar atendentes da loja ${tenantId}:`, error.message);
+            return [];
+        }
+    }
 }
 
 module.exports = new SupabaseService();
