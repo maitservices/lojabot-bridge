@@ -67,6 +67,7 @@ class SessionManager {
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: tenantId }),
             qrMaxRetries: 15, // Mantém o motor ligado por bastante tempo no servidor
+            webVersionCache: { type: 'none' },
             puppeteer: {
                 headless: true,
                 args: [
@@ -109,6 +110,24 @@ class SessionManager {
         client.on('message', async (msg) => {
             await onMessageCallback(tenantId, client, msg);
         });
+
+        //---------------------------
+        client.on('loading_screen', (percent, message) => {
+            console.log(`[SessionManager] ⏳ Loja ${tenantId} carregando o WhatsApp: ${percent}% - ${message}`);
+            // Avisa o front-end que a engrenagem está girando
+            if (this.io) this.io.to(tenantId).emit('whatsapp_status', { state: 'STARTING' });
+        });
+
+        client.on('authenticated', () => {
+            console.log(`[SessionManager] 🔐 Loja ${tenantId} autenticada com sucesso! Restaurando conversas...`);
+        });
+
+        client.on('auth_failure', msg => {
+            console.error(`[SessionManager] 🛑 Falha fatal de autenticação da loja ${tenantId}:`, msg);
+            // Se o token estiver corrompido, avisamos o front-end para mostrar a tela de erro
+            if (this.io) this.io.to(tenantId).emit('whatsapp_status', { state: 'DISCONNECTED' });
+        });
+        //------------------------------------
 
         this.sessions.set(tenantId, client);
         client.initialize();

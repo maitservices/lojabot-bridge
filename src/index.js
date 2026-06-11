@@ -38,7 +38,13 @@ io.on('connection', (socket) => {
     socket.on('request_current_status', async (tenantId) => {
         socket.join(tenantId); 
         const status = sessionManager.getSessionStatus(tenantId);
-        socket.emit('whatsapp_status', { state: status.state, number: status.number });
+        
+        // Emite o status e também passa um carimbo de tempo para forçar a re-renderização no front
+        socket.emit('whatsapp_status', { 
+            state: status.state, 
+            number: status.number,
+            timestamp: Date.now() // 🔥 Força o frontend a entender que é uma resposta nova
+        });
     });
 
     // 2. O usuário clicou no Botão "Conectar WhatsApp"
