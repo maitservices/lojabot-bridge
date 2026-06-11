@@ -41,7 +41,7 @@ class SessionManager {
             return this.sessions.get(tenantId);
         }
 
-        console.log(`[SessionManager] 🚀 Iniciando container lógico para a loja: ${tenantId}`);
+        //console.log(`[SessionManager] 🚀 Iniciando container lógico para a loja: ${tenantId}`);
 
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: tenantId }),

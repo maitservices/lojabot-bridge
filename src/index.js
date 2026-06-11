@@ -162,7 +162,7 @@ async function bootstrap() {
     try {
         // 🔥 JUSTIFICATIVA: Injetamos o servidor de WebSockets no gerenciador. 
         // Agora o SessionManager tem o poder de enviar imagens para o front-end.
-        sessionManager.setIO(io); 
+        sessionManager.setIO(io);
 
         const lojasAtivas = await supabaseService.buscarLojasAtivas();
         
@@ -170,7 +170,9 @@ async function bootstrap() {
             console.warn("Nenhuma loja ativa encontrada para iniciar.");
             // Não damos return aqui, pois o servidor web ainda precisa subir para novos clientes se cadastrarem
         } else {
+            let i = 0;
             for (const loja of lojasAtivas) {
+                console.log(`🚀 configurando Loja: ${++i}`);
                 await gemini.initializeTenant(loja.id);
                 await sessionManager.createSession(loja.id, handleIncomingMessage);
                 await new Promise(res => setTimeout(res, 3000));
@@ -180,7 +182,21 @@ async function bootstrap() {
         // 🔥 JUSTIFICATIVA CRÍTICA: Sem isso, o seu servidor Node.js é apenas um script local.
         // O 'server.listen' abre a porta 3001 para que o seu painel front-end consiga se conectar ao WebSocket.
         server.listen(3001, () => {
-            console.log("🌐 Servidor Web e WebSocket escutando na porta 3001");
+            console.log("          [ ]           .----------.");
+            console.log("           |            | uhuull!  |");
+            console.log("       .-------.        '----------'");
+            console.log("       | o   o |       /            ");
+            console.log("       |  ___  | <----'             ");
+            console.log("       | |___| |                    ");
+            console.log("       '-------'                    ");
+            console.log("      /|       |\\                  ");
+            console.log("     / | [===] | \\                 ");
+            console.log("    O  |       |  O                 ");
+            console.log("       '-------'                    ");
+            console.log("        |     |                     ");
+            console.log("      [___] [___]                   ");
+            console.log("                                    ");
+            console.log("🤖 LOJABOT ONLINE E PRONTO PARA VENDER! 🚀");
         });
 
     } catch (err) {

@@ -16,7 +16,7 @@ class GeminiService {
      * Prepara a estrutura de memória para uma loja nova
      */
     async initializeTenant(tenantId) {
-        console.log(`🔄 [Gemini] Iniciando configuração do modelo para a Loja: ${tenantId}...`);
+        //console.log(`🔄 [Gemini] Iniciando configuração do modelo para a Loja: ${tenantId}...`);
         
         // Cria a "gaveta" desta loja zerada
         this.tenants.set(tenantId, {
@@ -26,6 +26,8 @@ class GeminiService {
             catalogoTexto: "",       // Cardápio desta loja
             dicionarioImagens: new Map() // Fotos desta loja
         });
+
+        const tenantData = this.tenants.get(tenantId);
 
         // 🔥 O PULO DO GATO: Busca dinamicamente a configuração!
         const config = await supabaseService.getTenantConfig(tenantId);
@@ -46,33 +48,40 @@ class GeminiService {
         const tenantData = this.tenants.get(tenantId);
         if (!tenantData) return;
 
-        // Busca o array de produtos exclusivo DESTA loja no banco
-        const produtos = await supabaseService.getTenantCatalog(tenantId);
-        
-        if (produtos.length === 0) {
-            tenantData.catalogoBase = "\nA loja ainda não possui produtos cadastrados no sistema.";
-            this._rebuildSystemPrompt(tenantId);
-            return;
-        }
-
-        // Transforma o JSON do banco em um texto legível e estruturado para o cérebro da IA ler
-        let catalogoTexto = "\n--- CATÁLOGO DE PRODUTOS DA LOJA ---\n";
-        
-        produtos.forEach(prod => {
-            const preco = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(prod.valor_un);
-            catalogoTexto += `\n- PRODUTO: ${prod.nome_produto} (SKU: ${prod.sku})\n`;
-            catalogoTexto += `  Preço: ${preco} | Em Estoque: ${prod.qtd} unidades\n`;
-            if (prod.descricao) catalogoTexto += `  Detalhes: ${prod.descricao}\n`;
-            if (prod.imagens_urls) {
-                catalogoTexto += `  [IMPORTANTE: Se o cliente pedir foto, use a instrução interna [ACORDO:ENVIAR_FOTO|${prod.sku}|${prod.nome_produto}]]\n`;
-                // Guarda a URL real no dicionário de imagens para o envio nativo depois
-                tenantData.imagensProduto[prod.sku] = prod.imagens_urls; 
+        try {
+            // Busca o array de produtos exclusivo DESTA loja no banco
+            const produtos = await supabaseService.getTenantCatalog(tenantId);
+            
+            if (produtos.length === 0) {
+                tenantData.catalogoTexto = "\nA loja ainda não possui produtos cadastrados no sistema.";
+                this._rebuildSystemPrompt(tenantId);
+                return;
             }
-        });
-        catalogoTexto += "\n--- FIM DO CATÁLOGO ---\n";
 
-        tenantData.catalogoBase = catalogoTexto;
-        this._rebuildSystemPrompt(tenantId); // Junta o Prompt (Instruções) com o Catálogo novo
+            // Transforma o JSON do banco em um texto legível e estruturado para o cérebro da IA ler
+            let catalogoTexto = "\n--- CATÁLOGO DE PRODUTOS DA LOJA ---\n";
+            
+            produtos.forEach(prod => {
+                const preco = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(prod.valor_un);
+                catalogoTexto += `\n- PRODUTO: ${prod.nome_produto} (SKU: ${prod.sku})\n`;
+                catalogoTexto += `  Preço: ${preco} | Em Estoque: ${prod.qtd} unidades\n`;
+                if (prod.descricao) catalogoTexto += `  Detalhes: ${prod.descricao}\n`;
+                if (prod.imagens_urls) {
+                    catalogoTexto += `  [IMPORTANTE: Se o cliente pedir foto, use a instrução interna [ACORDO:ENVIAR_FOTO|${prod.sku}|${prod.nome_produto}]]\n`;
+                    // Guarda a URL real no dicionário de imagens para o envio nativo depois
+                    tenantData.dicionarioImagens.set(prod.sku, prod.imagens_urls); 
+                }
+            });
+            catalogoTexto += "\n--- FIM DO CATÁLOGO ---\n";
+
+            tenantData.catalogoTexto = catalogoTexto;
+            this._rebuildSystemPrompt(tenantId); // Junta o Prompt (Instruções) com o Catálogo novo
+        }catch (error) {
+            console.error(`🔥 Falha ao atualizar catálogo do tenant ${tenantId}:`, error.message);
+            // Em caso de erro, define um fallback para a IA não ficar "cega"
+            tenantData.catalogoTexto = "\O que acha de nos visitar e conferir as mehores ofertas?";
+            this._rebuildSystemPrompt(tenantId);
+        }
     }
 
     getChatSession(tenantId, userId) {
@@ -146,6 +155,25 @@ class GeminiService {
             console.error(`[GeminiService] Falha ao gerar resumo para ${userId}:`, error.message);
             return "O cliente solicitou atendimento humano ou quer fechar um pedido complexo. Favor verificar o histórico.";
         }
+    }
+
+    /**
+     * Junta a Persona com o Catálogo e inicializa/atualiza o modelo do Gemini
+     */
+    _rebuildSystemPrompt(tenantId) {
+        const tenantData = this.tenants.get(tenantId);
+        if (!tenantData) return;
+
+        // Junta as duas partes em um único prompt de sistema
+        const promptFinal = `${tenantData.instrucaoBase}\n\n${tenantData.catalogoTexto}`;
+
+        // Instancia o modelo passando a instrução completa
+        tenantData.model = this.genAI.getGenerativeModel({
+            model: process.env.GEMINI_MODEL,
+            systemInstruction: promptFinal
+        });
+
+        //console.log(`✅ [Gemini] Modelo reconstruído e pronto para a Loja: ${tenantId}`);
     }
 }
 
