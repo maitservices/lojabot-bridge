@@ -1,6 +1,7 @@
 const googleDrive = require('./GoogleDriveService');
 const productImport = require('./ProductImportService');
 const gemini = require('./GeminiService'); 
+const supabaseService = require('./SupabaseService');
 
 class CommandRouter {
     /**
