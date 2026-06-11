@@ -20,19 +20,33 @@ const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } 
 
 
 io.on('connection', (socket) => {
-    socket.on('join_tenant_room', async (tenantId) => {
-        socket.join(tenantId); // O lojista entra na sala exclusiva
-        
+    
+    // 1. O painel apenas pede "Como está a situação?"
+    socket.on('request_current_status', async (tenantId) => {
+        socket.join(tenantId); 
         const status = sessionManager.getSessionStatus(tenantId);
+        socket.emit('whatsapp_status', { state: status.state, number: status.number });
+    });
+
+    // 2. O usuário clicou no Botão "Conectar WhatsApp"
+    socket.on('action_start_session', async (tenantId) => {
+        socket.join(tenantId);
+        socket.emit('whatsapp_status', { state: 'STARTING' });
         
-        // Dispara o status visual ('WAITING_QR' ou 'CONNECTED')
-        socket.emit('whatsapp_status', { state: status.state, number: status.number, time: status.time });
+        // Pede pro SessionManager ligar a máquina daquela loja
+        await sessionManager.createSession(tenantId, handleIncomingMessage);
+    });
+
+    // 3. O usuário clicou no Botão "Mostrar QR Code"
+    socket.on('action_get_qr', async (tenantId) => {
+        socket.join(tenantId);
+        const qrBase64 = sessionManager.getLastQRCode(tenantId);
         
-        // 🔥 A CORREÇÃO DA SÍNDROME DO ATRASO: 
-        // Se a loja está aguardando pareamento E nós já geramos um QR no passado...
-        if (status.state === 'WAITING_QR' && status.qrData) {
-            // Manda a imagem Base64 imediatamente para injetar na tag <img>
-            socket.emit('whatsapp_qr', status.qrData);
+        if (qrBase64) {
+            socket.emit('deliver_qr_code', qrBase64);
+        } else {
+            // Se por acaso a imagem não estiver pronta, avisa que ainda tá processando
+            socket.emit('whatsapp_status', { state: 'STARTING' });
         }
     });
 });
