@@ -1,37 +1,41 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-// 🔥 JUSTIFICATIVA: Trocamos o 'qrcode-terminal' pelo 'qrcode'. 
-// O terminal não serve para SaaS. Precisamos gerar uma imagem para a web.
 const qrcode = require('qrcode'); 
 
 class SessionManager {
     constructor() {
         this.sessions = new Map(); 
-        // 🔥 JUSTIFICATIVA: Criamos uma variável para guardar a instância do WebSocket.
-        // Isso respeita o princípio de Injeção de Dependência. O SessionManager não cria o servidor web, ele apenas o usa.
         this.io = null; 
+        
+        // 🔥 NOVO: Cache de QR Codes. Guarda a última imagem gerada para cada loja.
+        // Previne a "Síndrome do Convidado Atrasado".
+        this.qrCodes = new Map(); 
     }
 
-    /**
-     * Recebe a instância do WebSocket criada lá no index.js
-     */
     setIO(ioInstance) {
         this.io = ioInstance;
     }
 
     /**
-     * 🔥 JUSTIFICATIVA: Quando o lojista abre a página de Conexão, o front-end pergunta "Qual meu status?".
-     * Este método verifica na memória do Puppeteer se o WhatsApp daquela loja específica já está logado ou não.
+     * Retorna o status atual da loja. Se estiver esperando QR Code, 
+     * devolve a imagem Base64 junto no pacote.
      */
     getSessionStatus(tenantId) {
         const client = this.sessions.get(tenantId);
+        
         if (!client) return { state: 'DISCONNECTED' };
         
-        // Se existir o objeto 'info' e 'wid', significa que o celular já escaneou e está pareado
+        // Se o WhatsApp já está pareado e pronto
         if (client.info && client.info.wid) {
             return { state: 'CONNECTED', number: client.info.wid.user, time: new Date() };
         }
         
-        // Se o cliente existe mas não tem 'info', ele está gerando QR Code
+        // Se está gerando QR Code, busca a imagem do Cache
+        const cachedQR = this.qrCodes.get(tenantId);
+        if (cachedQR) {
+            return { state: 'WAITING_QR', qrData: cachedQR };
+        }
+        
+        // Se o navegador ainda está abrindo e não gerou nenhum QR
         return { state: 'WAITING_QR' };
     }
 
@@ -40,8 +44,6 @@ class SessionManager {
             console.log(`[SessionManager] ⚠️ Sessão para a loja ${tenantId} já está rodando.`);
             return this.sessions.get(tenantId);
         }
-
-        //console.log(`[SessionManager] 🚀 Iniciando container lógico para a loja: ${tenantId}`);
 
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: tenantId }),
@@ -55,20 +57,17 @@ class SessionManager {
             }
         });
 
-        // ---------------------------------------------------------
-        // 🔥 OS NOVOS EVENTOS DO WHATSAPP (Roteados para o Frontend)
-        // ---------------------------------------------------------
-
         client.on('qr', async (qr) => {
             console.log(`[SessionManager] 📲 Novo QR Code gerado para a loja: ${tenantId}`);
             
             try {
-                // Converte o texto bruto do QR em uma string de imagem (Data URI Base64)
                 const qrImageBase64 = await qrcode.toDataURL(qr);
                 
+                // 1. Salva no cache da memória RAM para os visitantes atrasados
+                this.qrCodes.set(tenantId, qrImageBase64);
+                
+                // 2. Transmite ao vivo para quem já está na página de Conexão
                 if (this.io) {
-                    // JUSTIFICATIVA DE SEGURANÇA: Usamos o '.to(tenantId)' para garantir que o QR Code
-                    // seja enviado APENAS para a sala (room) daquele lojista. Uma loja nunca verá o QR da outra.
                     this.io.to(tenantId).emit('whatsapp_qr', qrImageBase64);
                     this.io.to(tenantId).emit('whatsapp_status', { state: 'WAITING_QR' });
                 }
@@ -79,8 +78,11 @@ class SessionManager {
 
         client.on('ready', () => {
             console.log(`[SessionManager] ✅ Loja ${tenantId} conectada e pronta para operar!`);
+            
+            // Limpa o cache do QR Code (Prevenção de vazamento de memória)
+            this.qrCodes.delete(tenantId);
+            
             if (this.io) {
-                // Assim que conecta, avisa o front-end para trocar a tela do QR para o "Card Verde" de Sucesso
                 this.io.to(tenantId).emit('whatsapp_ready', { 
                     state: 'CONNECTED', 
                     number: client.info.wid.user, 
@@ -91,17 +93,19 @@ class SessionManager {
 
         client.on('disconnected', (reason) => {
             console.log(`[SessionManager] ❌ Loja ${tenantId} desconectada. Motivo: ${reason}`);
+            
+            this.qrCodes.delete(tenantId); // Limpeza de segurança
+            
             if (this.io) {
                 this.io.to(tenantId).emit('whatsapp_status', { state: 'DISCONNECTED' });
             }
             client.destroy();
             this.sessions.delete(tenantId);
             
-            // Auto-healing: Tenta reiniciar a sessão do Puppeteer se ela cair sozinha
+            // Auto-healing: Reinicia o container do WhatsApp após 5 segundos
             setTimeout(() => this.createSession(tenantId, onMessageCallback), 5000);
         });
 
-        // O roteamento das mensagens continua igual
         client.on('message', async (msg) => {
             await onMessageCallback(tenantId, client, msg);
         });

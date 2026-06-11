@@ -21,9 +21,19 @@ const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } 
 
 io.on('connection', (socket) => {
     socket.on('join_tenant_room', async (tenantId) => {
-        socket.join(tenantId); // O lojista entra na sala exclusiva da loja dele
+        socket.join(tenantId); // O lojista entra na sala exclusiva
+        
         const status = sessionManager.getSessionStatus(tenantId);
-        socket.emit('whatsapp_status', status); // Manda o status atual na hora
+        
+        // Dispara o status visual ('WAITING_QR' ou 'CONNECTED')
+        socket.emit('whatsapp_status', { state: status.state, number: status.number, time: status.time });
+        
+        // 🔥 A CORREÇÃO DA SÍNDROME DO ATRASO: 
+        // Se a loja está aguardando pareamento E nós já geramos um QR no passado...
+        if (status.state === 'WAITING_QR' && status.qrData) {
+            // Manda a imagem Base64 imediatamente para injetar na tag <img>
+            socket.emit('whatsapp_qr', status.qrData);
+        }
     });
 });
 /**
