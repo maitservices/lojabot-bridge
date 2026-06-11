@@ -37,4 +37,4 @@ desktop.ini
 *.swp
 *.swo
 .project
-.settings/
+.settings/.env
