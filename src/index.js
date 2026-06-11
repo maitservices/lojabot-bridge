@@ -9,9 +9,22 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-
 const { MessageMedia } = require('whatsapp-web.js');
 const axios = require('axios');
+
+// =========================================================
+// BLINDAGEM DO PROCESSO NODE.JS (Anti-Crash)
+// Evita que erros internos do Puppeteer derrubem o servidor
+// =========================================================
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ [Sistema] Promessa rejeitada não tratada:', reason.message || reason);
+    // Nós apenas registramos o erro, mas NÃO matamos o servidor!
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('🚨 [Sistema] Exceção fatal não capturada:', error.message || error);
+});
+// =========================================================
 
 const app = express();
 app.use(cors());
