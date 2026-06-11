@@ -32,9 +32,15 @@ io.on('connection', (socket) => {
     socket.on('action_start_session', async (tenantId) => {
         socket.join(tenantId);
         socket.emit('whatsapp_status', { state: 'STARTING' });
-        
-        // Pede pro SessionManager ligar a máquina daquela loja
-        await sessionManager.createSession(tenantId, handleIncomingMessage);
+        try {
+            // 🔥 ADICIONE ESTA LINHA AQUI: Inicializa a IA para o clique manual
+            await gemini.initializeTenant(tenantId);
+            
+            // Pede pro SessionManager ligar a máquina daquela loja
+            await sessionManager.createSession(tenantId, handleIncomingMessage);
+        } catch (error) {
+            console.error(`[Erro ao inicializar Loja ${tenantId} via botão]:`, error);
+        }
     });
 
     // 3. O usuário clicou no Botão "Mostrar QR Code"
@@ -199,7 +205,7 @@ async function bootstrap() {
                 console.log(`🚀 configurando Loja: ${++i}`);
                 await gemini.initializeTenant(loja.id);
                 await sessionManager.createSession(loja.id, handleIncomingMessage);
-                await new Promise(res => setTimeout(res, 3000));
+                await new Promise(res => setTimeout(res, 4000));
             }
         }
 
