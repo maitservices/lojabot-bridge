@@ -68,8 +68,12 @@ class SessionManager {
                 
                 // 2. Transmite ao vivo para quem já está na página de Conexão
                 if (this.io) {
-                    this.io.to(tenantId).emit('whatsapp_qr', qrImageBase64);
+                    // 🔥 A CORREÇÃO: Ordem invertida!
+                    // Primeiro avisa o frontend para preparar a interface (colocar o loading)
                     this.io.to(tenantId).emit('whatsapp_status', { state: 'WAITING_QR' });
+                    
+                    // Em seguida, injeta a imagem definitiva que remove o loading
+                    this.io.to(tenantId).emit('whatsapp_qr', qrImageBase64);
                 }
             } catch (err) {
                 console.error(`[SessionManager] Erro ao converter QR para Base64 na loja ${tenantId}:`, err);
