@@ -2,6 +2,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode'); 
 const fs = require('fs');     // 🔥 Adicionado para manipular arquivos
 const path = require('path'); // 🔥 Adicionado para resolver caminhos
+const { execSync } = require('child_process');
 
 class SessionManager {
     constructor() {
@@ -18,32 +19,18 @@ class SessionManager {
      * AUTO-HEALING: Remove cadeados fantasmas do Chromium deixados por desligamentos abruptos.
      */
     clearPhantomLocks(tenantId) {
-        // O whatsapp-web.js salva as sessões nesta estrutura de pastas:
         const authPath = path.join(process.cwd(), '.wwebjs_auth', `session-${tenantId}`);
         
-        if (!fs.existsSync(authPath)) return; // Se a pasta não existe, não há o que limpar
-
-        // O Chromium pode esconder o cadeado na raiz ou na pasta Default
-        const locksToDestroy = [
-            path.join(authPath, 'SingletonLock'),
-            path.join(authPath, 'SingletonCookie'),
-            path.join(authPath, 'SingletonSocket'),
-            path.join(authPath, 'Default', 'SingletonLock'),
-            path.join(authPath, 'Default', 'SingletonCookie'),
-            path.join(authPath, 'Default', 'SingletonSocket')
-        ];
-
-        locksToDestroy.forEach(lockPath => {
+        if (fs.existsSync(authPath)) {
             try {
-                // Tenta apagar silenciosamente. Se conseguir, avisa no log.
-                if (fs.existsSync(lockPath)) {
-                    fs.unlinkSync(lockPath);
-                    console.log(`[Auto-Healing] 🔨 Cadeado fantasma destruído para a loja ${tenantId}`);
-                }
+                // O 'find' procura em todas as subpastas.
+                // O '|| true' garante que o Node não trave caso não encontre nenhum arquivo.
+                execSync(`find ${authPath} -name "Singleton*" -delete || true`);
+                console.log(`[Auto-Healing] 🔨 Limpeza profunda via Shell concluída para a loja ${tenantId}`);
             } catch (error) {
-                // Ignora erros de permissão
+                console.error(`[Auto-Healing] Falha ao executar limpeza shell na loja ${tenantId}:`, error.message);
             }
-        });
+        }
     }
 
     // Função NOVA para o botão "Mostrar QR Code" buscar
