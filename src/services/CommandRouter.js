@@ -21,7 +21,7 @@ class CommandRouter {
         const isAdmin = config && numeroRemetente === config.admin_number;
         
         if (!isAdmin){
-            console.log(`[Loja ${tenantId}] 🔒 Bloqueado: Remetente não é o admin da loja.`);
+            //console.log(`[Loja ${tenantId}] 🔒 Bloqueado: Remetente não é o admin da loja.`);
             return false;
         }
 
